@@ -236,7 +236,7 @@ class Bug(CaseLinkItem):
     base_url = CASELINK_URL + 'bug/'
     def __init__(self, bz_id):
         self._id = str(bz_id)
-        self._url = base_url + str(bz_id) + '/'
+        self._url = self.base_url + str(bz_id) + '/'
 
     def __str__(self):
         return "<Bug " + str(self.id) + ">"
