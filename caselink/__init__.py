@@ -247,7 +247,7 @@ class Bug(CaseLinkItem):
 
     @property
     def url(self):
-        return self._id
+        return self._url
 
     @lazy_property
     def autocases(self):
@@ -283,7 +283,7 @@ class AutoCaseFailure(CaseLinkItem):
         return "<Failure " + str(self.id) + ">"
 
     @classmethod
-    def create(cls, failure_regex, autocase_pattern, failure_type=None, bug=None):
+    def create(cls, failure_regex, autocase_pattern, failure_type='BUG', bug=None):
         if failure_type not in ['BUG', 'CASE-UPDATE']:
             raise RuntimeError()
         if failure_type == 'BUG' and not bug:
