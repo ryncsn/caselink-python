@@ -1,8 +1,41 @@
+import os
 import requests
 from abc import ABCMeta, abstractproperty
 from flask import current_app
+from ConfigParser import SafeConfigParser
 
-CASELINK_URL = 'http://127.0.0.1:8888/'
+
+PKGDIR = os.path.dirname(__file__)
+CONFIG = DEFAULT = {
+    "caselink-url": "http://127.0.0.1:8888/",
+    "timeout": "30",
+    "debug": "off"
+}
+
+
+CONFIG_SECTION = "server"
+# Config loading priority:
+CURDIR_CONFIG = ".caselink-python.cfg"
+LOCAL_CONFIG = os.path.expanduser("~") + "/.caselink-python.cfg"
+GLOBAL_CONFIG = "/etc/caselink-python.cfg"
+PKG_CONFIG = "%s/caselink-python.cfg" % PKGDIR
+
+
+def _load_config():
+    config = SafeConfigParser(DEFAULT)
+    if not config.read([PKG_CONFIG, GLOBAL_CONFIG, LOCAL_CONFIG, CURDIR_CONFIG]) or \
+            not config.has_section(CONFIG_SECTION):
+        raise RuntimeError("Config files not avaliable")
+
+    CONFIG.update(
+        dict(
+            [(k, config.get(CONFIG_SECTION, k)) for k in CONFIG.keys()]
+        )
+    )
+
+_load_config()
+CASELINK_URL = CONFIG['caselink-url']
+
 
 def lazy_property(fn):
     lazy_name = '__lazy__' + fn.__name__
@@ -266,6 +299,11 @@ class Bug(CaseLinkItem):
         for case in self.json['manualcases']:
             cases.append(ManualCase(case))
         return cases
+
+    @manualcases.setter
+    def manualcases_setter(self, value):
+        self.json['manualcases'] = value
+
 
 
 class AutoCaseFailure(CaseLinkItem):
