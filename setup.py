@@ -7,5 +7,6 @@ setup(name='caselink-python',
       author='Kairui Song',
       author_email='kasong@redhat.com',
       packages=['caselink'],
+      data_files=[('/etc', ['caselink/caselink-python.cfg'])],
       zip_safe=False)
 
