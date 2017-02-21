@@ -1,8 +1,8 @@
 import os
-import requests
 from abc import ABCMeta, abstractproperty
-from flask import current_app
 from ConfigParser import SafeConfigParser
+
+import requests
 
 
 PKGDIR = os.path.dirname(__file__)
@@ -52,6 +52,7 @@ class CaseLinkItem():
     Base Class for all Caselink Item
     """
     __metaclass__ = ABCMeta
+    base_url = None
 
     @abstractproperty
     def url(self):
@@ -59,9 +60,6 @@ class CaseLinkItem():
 
     @abstractproperty
     def id(self):
-        pass
-
-    def __init__(self):
         pass
 
     @property
@@ -87,15 +85,8 @@ class CaseLinkItem():
         return self.json[name]
 
     @classmethod
-    def create(cls, id, **kwargs):
-        json = kwargs
-        json['id'] = id
-        res = requests.post(cls.base_url, json=json)
-
-        #TODO
-        #if res.json()['non_field_errors']:
-        #    return cls(res.json()['id'])
-
+    def create(cls, **kwargs):
+        res = requests.post(cls.base_url, json=kwargs)
         res.raise_for_status()
 
         return cls(res.json()['id'])
@@ -160,7 +151,7 @@ class CaseLinkItem():
 
 
 class AutoCase(CaseLinkItem):
-    base_url = CASELINK_URL + 'auto/'
+    base_url = CASELINK_URL + 'autocase/'
     def __init__(self, case_id):
         self._id = str(case_id)
         self._url = self.base_url + str(case_id) + '/'
@@ -178,57 +169,45 @@ class AutoCase(CaseLinkItem):
 
     @lazy_property
     def linkages(self):
-        caselinks = []
-        for link in self.json['caselinks']:
-            caselinks.append(Linkage(link))
-        return caselinks
+        return [Linkage(link) for link in self.json['linkages']]
 
     @linkages.setter
-    def linkages_setter(self, manualcases):
+    def linkages_setter(self, _):
         raise RuntimeError("Please Use Linkage.create to create linkage.")
 
     @lazy_property
-    def manualcases(self):
-        cases = []
-        for link in [Linkage(link_id) for link_id in self.json['caselinks']]:
-            cases.append(ManualCase(link.workitem))
-        return cases
+    def workitems(self):
+        return [WorkItem(link.workitem) for link in self.linkages]
 
-    @manualcases.setter
-    def manualcases_setter(self, manualcases):
+    @workitems.setter
+    def workitems_setter(self, _):
         raise RuntimeError("Please Use Linkage.create to create linkage.")
 
     @lazy_property
     def bugs(self):
-        bugs = []
-        for bug in self.json['bugs']:
-            bugs.append(Bug(bug))
-        return bugs
+        return [Bug(bug) for bug in self.json['bugs']]
 
     @bugs.setter
-    def bugs_setter(self, manualcases):
+    def bugs_setter(self, _):
         raise RuntimeError("Please Use AutoCase Pattern to Link autocases.")
 
     @lazy_property
-    def failures(self):
-        failures = []
-        for failure in self.json['failures']:
-            failures.append(AutoCaseFailure(failure))
-        return failures
+    def autocase_failures(self):
+        return [AutoCaseFailure(failure) for failure in self.json['autocase_failures']]
 
-    @failures.setter
-    def failures_setter(self, manualcases):
+    @autocase_failures.setter
+    def autocase_failures_setter(self, _):
         raise RuntimeError("Please Use AutoCase Pattern to Link autocases.")
 
 
-class ManualCase(CaseLinkItem):
-    base_url = CASELINK_URL + 'manual/'
+class WorkItem(CaseLinkItem):
+    base_url = CASELINK_URL + 'workitem/'
     def __init__(self, case_id):
         self._id = str(case_id)
         self._url = self.base_url + str(case_id) + '/'
 
     def __str__(self):
-        return "<ManualCase " + str(self.id) + ">"
+        return "<WorkItem " + str(self.id) + ">"
 
     @property
     def id(self):
@@ -240,29 +219,26 @@ class ManualCase(CaseLinkItem):
 
     @lazy_property
     def linkages(self):
-        caselinks = []
-        for link in self.json['caselinks']:
-            caselinks.append(Linkage(link))
-        return caselinks
+        return [Linkage(link) for link in self.json['linkages']]
 
     @linkages.setter
-    def linkages_setter(self, manualcases):
+    def linkages_setter(self, _):
         raise RuntimeError("Please Use Linkage.create to create linkage.")
 
     @lazy_property
     def autocases(self):
         cases = []
-        for link in [Linkage(link_id) for link_id in self.json['caselinks']]:
-            for autocase in link.autocases:
-                cases.append(AutoCase(autocase))
+        for link in [Linkage(link_id) for link_id in self.json['linkages']]:
+            cases.extend(link.autocases)
         return cases
+
+    @autocases.setter
+    def autocases_setter(self):
+        raise RuntimeError("Please Use create()")
 
     @lazy_property
     def bugs(self):
-        bugs = []
-        for bug in self.json['bugs']:
-            bugs.append(Bug(bug))
-        return bugs
+        return [Bug(bug) for bug in self.json['bugs']]
 
 
 class Bug(CaseLinkItem):
@@ -282,33 +258,9 @@ class Bug(CaseLinkItem):
     def url(self):
         return self._url
 
-    @lazy_property
-    def autocases(self):
-        cases = []
-        for case in self.json['autocases']:
-            cases.append(AutoCase(case))
-        return cases
-
-    @autocases.setter
-    def autocase_setter(self, autocases):
-        raise RuntimeError("Please Use AutoCase Pattern to Link autocases.")
-
-    @lazy_property
-    def manualcases(self):
-        cases = []
-        for case in self.json['manualcases']:
-            cases.append(ManualCase(case))
-        return cases
-
-    @manualcases.setter
-    def manualcases_setter(self, value):
-        self.json['manualcases'] = value
-
-
-
 class AutoCaseFailure(CaseLinkItem):
     unique_together = ("failure_regex", "autocase_pattern",)
-    base_url = CASELINK_URL + 'failure/'
+    base_url = CASELINK_URL + 'autocase_failure/'
 
     def __init__(self, id):
         """
@@ -321,26 +273,12 @@ class AutoCaseFailure(CaseLinkItem):
         return "<Failure " + str(self.id) + ">"
 
     @classmethod
-    def create(cls, failure_regex, autocase_pattern, failure_type='BUG', bug=None):
-        if failure_type not in ['BUG', 'CASE-UPDATE']:
-            raise RuntimeError()
-        if failure_type == 'BUG' and not bug:
-            raise RuntimeError()
-
-        res = requests.post(cls.base_url, json={
+    def create(cls, failure_regex, autocase_pattern, **kwarg):
+        kwarg.update({
             'failure_regex': failure_regex,
             'autocase_pattern': autocase_pattern,
-            'type': failure_type,
-            'bug': bug,
         })
-
-        #TODO
-        #if res.json()['non_field_errors']:
-        #    return cls(res.json()['id'])
-
-        res.raise_for_status()
-
-        return cls(res.json()['id'])
+        return super(AutoCaseFailure, cls).create(**kwarg)
 
     @property
     def id(self):
@@ -355,16 +293,21 @@ class AutoCaseFailure(CaseLinkItem):
         return Bug(self.json['bug'])
 
     @lazy_property
-    def manualcases(self):
-        cases = []
-        for case in self.bug.manualcases:
-            cases.append(ManualCase(case.id))
-        return cases
+    def autocases(self):
+        return [AutoCase(case) for case in self.json['autocases']]
+
+    @lazy_property
+    def blacklist_entries(self):
+        return [BlackListEntry(bl) for bl in self.json['blacklist_entries']]
+
+    @autocases.setter
+    def autocase_setter(self, autocases):
+        raise RuntimeError("Please Use AutoCase Pattern to Link autocases.")
 
 
 class Linkage(CaseLinkItem):
     unique_together = ("workitem", "autocase_pattern",)
-    base_url = CASELINK_URL + 'link/'
+    base_url = CASELINK_URL + 'linkage/'
 
     def __init__(self, id):
         """
@@ -377,18 +320,12 @@ class Linkage(CaseLinkItem):
         return "<Linkage workitem:" + str(self.workitem) + " pattern: " + str(self.autocase_pattern) + ">"
 
     @classmethod
-    def create(cls, workitem, autocase_pattern):
-        res = requests.post(cls.base_url, json={
+    def create(cls, workitem, autocase_pattern, **kwarg):
+        kwarg.update({
             'workitem': workitem,
             'autocase_pattern': autocase_pattern,
         })
-
-        #if res.json()['non_field_errors']:
-        #    return cls(res.json()['id'])
-
-        res.raise_for_status()
-
-        return cls(res.json()['id'])
+        return super(Linkage, cls).create(**kwarg)
 
     @property
     def id(self):
@@ -397,3 +334,66 @@ class Linkage(CaseLinkItem):
     @property
     def url(self):
         return self._url
+
+    @lazy_property
+    def autocases(self):
+        return [AutoCase(case) for case in self.json['autocases']]
+
+    @autocases.setter
+    def autocase_setter(self, autocases):
+        raise RuntimeError("Please Use AutoCase Pattern to Link autocases.")
+
+
+class BlackListEntry(CaseLinkItem):
+    base_url = CASELINK_URL + 'blacklist/'
+
+    def __init__(self, id):
+        """
+        Surrogate key
+        """
+        self._id = str(id)
+        self._url = self.base_url + str(id) + '/'
+
+    def __str__(self):
+        return "<BlackListEntry:" + str(self.status) + ", id: " + str(self.id) + ">"
+
+    @classmethod
+    def create(cls, status, workitems, autocase_failures, **kwarg):
+        kwarg.update({
+            'status': status,
+            'workitems': workitems,
+            'autocase_failure': autocase_failures,
+        })
+        return super(BlackListEntry, cls).create(**kwarg)
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def url(self):
+        return self._url
+
+    @lazy_property
+    def autocase_failures(self):
+        return [AutoCaseFailure(failure) for failure in self.json['autocase_failures']]
+
+    @lazy_property
+    def workitems(self):
+        return [WorkItem(wi) for wi in self.json['workitems']]
+
+    @workitems.setter
+    def workitems_setter(self, value):
+        self.json['workitems'] = value
+
+    @lazy_property
+    def autocases(self):
+        cases = []
+        for failure in [AutoCaseFailure(failure) for failure in self.json['autocase_failures']]:
+            for autocase in failure.autocases:
+                cases.append(AutoCase(autocase))
+        return cases
+
+    @autocases.setter
+    def autocases_setter(self):
+        raise RuntimeError("Please Use create()")
