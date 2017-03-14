@@ -8,5 +8,6 @@ setup(name='caselink',
       author_email='kasong@redhat.com',
       packages=['caselink'],
       package_data={'caselink': ['caselink-python.cfg']},
+      install_requires=['requests'],
       zip_safe=False)
 
