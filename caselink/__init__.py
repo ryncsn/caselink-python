@@ -1,9 +1,6 @@
 import os
-from abc import ABCMeta, abstractproperty
-try:
-    from ConfigParser import SafeConfigParser
-except ImportError:
-    from configparser import SafeConfigParser
+from abc import ABCMeta, abstractmethod
+from configparser import ConfigParser
 
 import requests
 
@@ -25,14 +22,14 @@ PKG_CONFIG = "%s/caselink-python.cfg" % PKGDIR
 
 
 def _load_config():
-    config = SafeConfigParser(DEFAULT)
+    config = ConfigParser(DEFAULT)
     if not config.read([PKG_CONFIG, GLOBAL_CONFIG, LOCAL_CONFIG, CURDIR_CONFIG]) or \
             not config.has_section(CONFIG_SECTION):
         raise RuntimeError("Config files not avaliable")
 
     CONFIG.update(
         dict(
-            [(k, config.get(CONFIG_SECTION, k)) for k in CONFIG.keys()]
+            [(k, config.get(CONFIG_SECTION, k)) for k in list(CONFIG.keys())]
         )
     )
 
@@ -50,18 +47,19 @@ def lazy_property(fn):
     return lazy_eval
 
 
-class CaseLinkItem():
+class CaseLinkItem(metaclass=ABCMeta):
     """
     Base Class for all Caselink Item
     """
-    __metaclass__ = ABCMeta
     base_url = None
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def url(self):
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def id(self):
         pass
 
@@ -102,7 +100,7 @@ class CaseLinkItem():
         #Raise error if anything went wrong.
         respons.raise_for_status()
         self.json = respons.json()
-        for attr, value in self.__dict__.iteritems():
+        for attr in list(self.__dict__.keys()):
             if attr.startswith('__lazy__'):
                 delattr(self, attr)
         return self
