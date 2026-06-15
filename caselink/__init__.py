@@ -25,7 +25,7 @@ def _load_config():
     config = ConfigParser(DEFAULT)
     if not config.read([PKG_CONFIG, GLOBAL_CONFIG, LOCAL_CONFIG, CURDIR_CONFIG]) or \
             not config.has_section(CONFIG_SECTION):
-        raise RuntimeError("Config files not avaliable")
+        raise RuntimeError("Config files not available")
 
     CONFIG.update(
         dict(
